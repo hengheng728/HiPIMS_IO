@@ -66,7 +66,8 @@ def InundationMap(zMat,zHead,depth=0.2,figureName=[],
     # colorbar
     fig.colorbar(img,ax=ax,fraction=0.1,shrink=0.8)
     # draw domain outline cells
-    ax.scatter(boundX,boundY,s=0.5,facecolor='r')
+    ax.scatter(boundX,boundY,s=0.2,facecolor='r')
+    ax.axes.grid(linestyle='-.',linewidth=0.2)
     # save figure
     if len(figureName)>0:
         fig.savefig(figureName, dpi=dpi)
