@@ -6,9 +6,8 @@ Created on Mon Dec 17 12:36:25 2018
 @author: Xiaodong Ming
 """
 import os
-import numpy as np
 import OutputManage as OM
-import matplotlib.pyplot as mplPy
+import Visualization as VL
 rootPath = '/home/b1055010/GeoClasses/release/bin/Eden6_5mMGPUs/'
 os.chdir(rootPath)
 numSection=6
@@ -17,15 +16,11 @@ grid,head,extent=OM.CombineGridFile(rootPath,numSection,fileTag)
 fileName = fileTag+'.asc'
 print(fileName+' is combined')
 OM.ArcgridwriteGZip(fileName,grid,head)
+figureName=fileTag+'.png'
+VL.InundationMap(grid,head,depth=0.1,figureName=figureName,
+                    figsize=(10, 6),dpi=800)
 
-np.warnings.filterwarnings('ignore')
-grid[grid<0.1]=np.nan
-fig, ax = mplPy.subplots(1, figsize=(6, 10))
-img = mplPy.imshow(grid,extent=extent)
-mplPy.colorbar(img,fraction=0.05, pad=0.01,shrink=0.92,ax=ax)
-ax.axes.grid(linestyle='--',linewidth=0.5)
-fig.savefig(fileTag+'.png', dpi=800)
-print('figure '+fileTag+'.png is drawn')
+print(figureName+'.png is drawn')
 
-Time=21600
-OM.Backup2Initial(rootPath,numSection,Time,remove=True)
+#Time=21600
+#OM.Backup2Initial(rootPath,numSection,Time,remove=True)
