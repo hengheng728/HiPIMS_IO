@@ -10,12 +10,13 @@ import OutputManage as OM
 import Visualization as VL
 rootPath = '/home/b1055010/GeoClasses/release/bin/Eden6_5mMGPUs/'
 os.chdir(rootPath)
-numSection=6
+#numSection=6
 fileTag = 'h_21600'
-grid,head,extent=OM.CombineGridFile(rootPath,numSection,fileTag)
-fileName = fileTag+'.asc'
-print(fileName+' is combined')
-OM.ArcgridwriteGZip(fileName,grid,head)
+#grid,head,extent=OM.CombineGridFile(rootPath,numSection,fileTag)
+#fileName = fileTag+'.asc'
+#print(fileName+' is combined')
+#OM.ArcgridwriteGZip(fileName,grid,head)
+grid,head,extent = OM.ArcgridreadGZip(fileTag+'.asc.gz')
 figureName=fileTag+'.png'
 VL.InundationMap(grid,head,depth=0.1,figureName=figureName,
                     figsize=(10, 6),dpi=800)
