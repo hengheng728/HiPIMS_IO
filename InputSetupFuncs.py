@@ -7,11 +7,12 @@ Created on Mon Dec 10 17:55:15 2018
 """
 import numpy as np
 import os
+import pandas as pd
 #import matplotlib as mpl
 #import time
 import matplotlib.patches as mplP
 import scipy.signal
-from ArcGridDataProcessing import makeDiagonalShape,demHead2Extent
+from ArcGridDataProcessing import arcgridread,makeDiagonalShape,demHead2Extent
 """
 Key varaible names:
 
@@ -379,3 +380,31 @@ def WriteGaugePos(fileFolder,gauges_pos):
         file2write.write(gauges_pos_Str)
 #        np.savetxt(file2write,gauges_pos,fmt=fmt,delimiter=' ')
     #print(fileName+' is created')
+#%%    
+def Ztype2Grid(inputFolder,fileTag):
+    # convert ztype field file to a grid file
+    # zMat,zHead,zExtent = Ztype2Grid(inputFolder,fileTag)
+    # require the existance of DEM.txt file in input/mesh
+    # example: zMat,zHead,zExtent = Ztype2Grid('CaseP/input','h')
+    if inputFolder[-1]!='/':
+        inputFolder=inputFolder+'/'
+    demFile = inputFolder+'mesh/DEM.txt'
+    zMat,zHead,zExtent = arcgridread(demFile)
+    zTypeFile = inputFolder+'field/' +fileTag+'.dat'
+    with open(zTypeFile,'r') as f:    
+        headlines = [next(f) for x in range(2)]
+        N = int(headlines[1])
+        vecArray=pd.read_csv(f,delim_whitespace=True ,nrows=N)
+    cellID,_ = Get_ID_BNoutline_Mat(zMat)
+    subs = np.where(~np.isnan(cellID))
+    ind = np.where(~np.isnan(cellID))
+    #Cell_ID_Subs: 1st col is valid cell ID, 
+    #              2nd & 3rd cols are rows and cols in DEM
+    Cell_ID_Subs = np.c_[cellID[ind],ind[0],ind[1]]
+    if Cell_ID_Subs.shape[0]!=N:
+        raise TypeError('The size of DEM not consistent with '+fileTag+'.dat')
+    Cell_ID_Subs = Cell_ID_Subs[Cell_ID_Subs[:,0].argsort()]
+    subs = Cell_ID_Subs[:,[1,2]]
+    subs = subs.astype('int64')
+    zMat[subs[:,0],subs[:,1]]=np.array(vecArray.Value)
+    return zMat,zHead,zExtent
