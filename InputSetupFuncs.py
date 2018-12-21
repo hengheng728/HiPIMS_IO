@@ -381,13 +381,14 @@ def WriteGaugePos(fileFolder,gauges_pos):
 #        np.savetxt(file2write,gauges_pos,fmt=fmt,delimiter=' ')
     #print(fileName+' is created')
 #%%    
-def Ztype2Grid(inputFolder,fileTag):
+def Ztype2Grid(rootPath,fileTag):
     # convert ztype field file to a grid file
-    # zMat,zHead,zExtent = Ztype2Grid(inputFolder,fileTag)
+    # zMat,zHead,zExtent = Ztype2Grid(rootPath,fileTag)
     # require the existance of DEM.txt file in input/mesh
     # example: zMat,zHead,zExtent = Ztype2Grid('CaseP/input','h')
-    if inputFolder[-1]!='/':
-        inputFolder=inputFolder+'/'
+    if rootPath[-1]!='/':
+        rootPath=rootPath+'/'
+    inputFolder = rootPath+'input/'    
     demFile = inputFolder+'mesh/DEM.txt'
     zMat,zHead,zExtent = arcgridread(demFile)
     zTypeFile = inputFolder+'field/' +fileTag+'.dat'
@@ -406,5 +407,12 @@ def Ztype2Grid(inputFolder,fileTag):
     Cell_ID_Subs = Cell_ID_Subs[Cell_ID_Subs[:,0].argsort()]
     subs = Cell_ID_Subs[:,[1,2]]
     subs = subs.astype('int64')
-    zMat[subs[:,0],subs[:,1]]=np.array(vecArray.Value)
+    if fileTag=='hU':
+        zMat0=zMat+0
+        zMat1=zMat+0
+        zMat0[subs[:,0],subs[:,1]]=np.array(vecArray.iloc[:,0])
+        zMat1[subs[:,0],subs[:,1]]=np.array(vecArray.iloc[:,1])
+        zMat = [zMat0,zMat1]
+    else:
+        zMat[subs[:,0],subs[:,1]]=np.array(vecArray.Value)
     return zMat,zHead,zExtent

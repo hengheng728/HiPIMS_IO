@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+HiPIMS input setup functions for Multiple GPUs
 Created on Thu Dec  6 12:31:31 2018
 
 @author: Xiaodong Ming
@@ -14,7 +15,7 @@ from ArcGridDataProcessing import arcgridwrite,demHead2Extent,makeDiagonalShape
 from InputSetupFuncs import CreateIOFolders,Get_ID_BNoutline_Mat,\
     WriteRainSource,Write_ZtypeFile,\
     Create_ID_BoundCode_Array,Create_ID_zValue_Array,\
-    WriteRainMask,WriteBoundSource,WriteGaugePos
+    WriteRainMask,WriteBoundSource,WriteGaugePos,Ztype2Grid
 #%%############################################################################
 #-------------------------Data processing functions----------------------------
 ############################################################################### 
@@ -302,3 +303,41 @@ def WriteGaugesPos_Ind(sectionPathList,demHeadList,gauges_pos):
     end = time.perf_counter()
     timeElapse = end-start
     return timeElapse
+#%% Convert ZtypeFiles to Grid file in multiGPU folder
+def Ztype2Grid_MG(caseFolder,numSection,fileTag):
+    #Convert ZtypeFiles to Grid file in multiGPU folder
+    #fileTag: 'z','h',
+    if caseFolder[-1]!='/':
+        caseFolder=caseFolder+'/' 
+    zHeadGlobal = []
+    for i in range(numSection):
+        rootPath = caseFolder+str(i)+'/'
+        zMat,zHead,_ = Ztype2Grid(rootPath,fileTag)
+        if fileTag=='hU':
+            if i==0:
+                zMatGlobal0=zMat[0]
+                zMatGlobal1=zMat[1]
+                zHeadGlobal = zHead
+            else:
+                zMatGlobal0 = np.r_[zMat[0][0:-2,:],zMatGlobal0]
+                zMatGlobal1 = np.r_[zMat[1][0:-2,:],zMatGlobal1]
+            zMatGlobal = [zMatGlobal0,zMatGlobal1]
+        else:
+            if i==0:
+                zMatGlobal=zMat
+                zHeadGlobal = zHead
+            else:
+                zMatGlobal = np.r_[zMat[0:-2,:],zMatGlobal]
+    if isinstance(zMatGlobal,list):
+        row,col = zMatGlobal[0].shape
+    else:
+        row,col = zMatGlobal.shape
+    zHeadGlobal['ncols'] = col
+    zHeadGlobal['nrows'] = row
+    left = zHeadGlobal['xllcorner']
+    right = zHeadGlobal['xllcorner']+zHeadGlobal['ncols']*zHeadGlobal['cellsize']
+    bottom = zHeadGlobal['yllcorner']
+    top = zHeadGlobal['yllcorner']+zHeadGlobal['nrows']*zHeadGlobal['cellsize']
+    zExtentGlobal = (left,right,bottom,top)
+    return zMatGlobal,zHeadGlobal,zExtentGlobal
+    
