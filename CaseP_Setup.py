@@ -9,13 +9,11 @@ Created on Sun Dec  2 21:40:54 2018
 import os
 import numpy as np
 import time
-os.chdir('C:/Users/b4042552/Dropbox/Python')
-from ArcGridDataProcessing import arcgridread
-import HiPIMS_IO as HPIO
-path = 'D:/cudaSWEsSolver/London38001/'
-os.chdir(path)
+#os.chdir('/Users/b4042552/Dropbox/Python')
+import HiPIMS as HI
+import HiPIMS.HiPIMS_IO as HPIO
 start=time.perf_counter()
-demMat,demHead,demExtent = arcgridread(path+'dtm10m.txt')
+demMat,demHead,demExtent = HI.ArcGridDataProcessing.arcgridread('/Users/b4042552/Dropbox/Python/Data/UpperLee500m.asc')
 end=time.perf_counter()
 print(end-start)
 #%%
@@ -34,7 +32,7 @@ gauges_pos = np.array([[534.5,231.3],
                        [542.5,225.0],
                        [538.2,212.5],
                        [530.3,219.4]])*1000
-rootPath='D:/cudaSWEsSolver/London38001/'
+rootPath='/Users/b4042552/Dropbox/Python/CaseP'
 numSection=4
 #%% Single GPU
 start = time.perf_counter()
@@ -45,10 +43,13 @@ HPIO.InputSetup(rootPath,demMat,demHead,h0=0,
 end = time.perf_counter()
 print('total time elapse: '+str(end-start))
 #%% Multiple GPU
-#start = time.perf_counter()
-#HPIO.InputSetup_MG(rootPath,demMat,demHead,numSection=numSection,h0=0,
-#                        boundList=boundList,fileToCreate='precipitation_mask',
-#                        rain_source = rain_source,
-#                        gauges_pos=gauges_pos)
-#end = time.perf_counter()
-#print('total time elapse: '+str(end-start))
+start = time.perf_counter()
+HPIO.InputSetup_MG(rootPath,demMat,demHead,numSection=numSection,h0=0,
+                        boundList=boundList,fileToCreate='all',
+                        rain_source = rain_source,
+                        gauges_pos=gauges_pos)
+end = time.perf_counter()
+print('total time elapse: '+str(end-start))
+#%%
+from InputSetupFuncs_MG import Ztype2Grid_MG
+A,B,C=Ztype2Grid_MG(rootPath,numSection,'precipitation_mask')
