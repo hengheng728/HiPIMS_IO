@@ -313,7 +313,7 @@ def Ztype2Grid_MG(caseFolder,numSection,fileTag):
     for i in range(numSection):
         rootPath = caseFolder+str(i)+'/'
         zMat,zHead,_ = Ztype2Grid(rootPath,fileTag)
-        if fileTag=='hU':
+        if 'hU' in fileTag:
             if i==0:
                 zMatGlobal0=zMat[0]
                 zMatGlobal1=zMat[1]

@@ -407,7 +407,7 @@ def Ztype2Grid(rootPath,fileTag):
     Cell_ID_Subs = Cell_ID_Subs[Cell_ID_Subs[:,0].argsort()]
     subs = Cell_ID_Subs[:,[1,2]]
     subs = subs.astype('int64')
-    if fileTag=='hU':
+    if 'hU' in fileTag:
         zMat0=zMat+0
         zMat1=zMat+0
         zMat0[subs[:,0],subs[:,1]]=np.array(vecArray.iloc[:,0])
