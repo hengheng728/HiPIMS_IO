@@ -13,6 +13,8 @@ __author__ = 'Xiaodong Ming'
 #%reset -f reset the console and delete all variables
 #import linecache
 import numpy as np
+import glob
+import gzip
 #import os
 def arcgridread(fileName,headrows = 6):
     """
@@ -91,9 +93,9 @@ def Map2Sub(X,Y,zHead):
     x11 = zHead['xllcorner']+0.5*zHead['cellsize']
     y11 = zHead['yllcorner']+(zHead['nrows']+0.5)*zHead['cellsize']
     rows = -(Y-y11)/zHead['cellsize']
-    rows = rows.astype('int64')
+    rows = int(rows)-1
     cols = (X-x11)/zHead['cellsize']+1
-    cols = cols.astype('int64')
+    cols = int(cols)-1#.astype('int64')
     return rows,cols
 #%%
 def Sub2Map(rows,cols,zHead):
@@ -118,3 +120,93 @@ def MaskInterp(maskMat,maskHead,zMat,zHead):
     zMask = zMat+0
     zMask[rows_Z,cols_Z]=values
     return zMask
+#%% Write and compress asc file
+def ArcgridwriteGZip(fileName,Z,head):
+    # fileName: compressed file name (automatically added by a suffix '.gz') 
+    # example：
+    # ArcgridwriteGZip('file.txt',zMat,zHead)
+    Z = Z+0
+    if not isinstance(head,dict):
+        raise TypeError('bad argument: head')
+    if fileName[-3:]!='.gz':
+        fileName = fileName+'.gz'  
+    the_ascfile=gzip.open(fileName, 'wb')        
+    the_ascfile.write(b"ncols    %d\n" % head['ncols'])
+    the_ascfile.write(b"nrows    %d\n" % head['nrows'])
+    the_ascfile.write(b"xllcorner    %g\n" % head['xllcorner'])
+    the_ascfile.write(b"yllcorner    %g\n" % head['yllcorner'])
+    the_ascfile.write(b"cellsize    %g\n" % head['cellsize'])
+    the_ascfile.write(b"NODATA_value    %g\n" % head['NODATA_value'])
+    Z[np.isnan(Z)]= head['NODATA_value']
+    np.savetxt(the_ascfile,Z,fmt='%.3f', delimiter=' ')
+    the_ascfile.close()
+    print(fileName)
+    return None
+#%%
+def ArcgridreadGZip(fileName):
+    """
+    read ArcGrid format raster file and return the gridded data array, 
+    coordinates and cellsize information and the extent of the grid
+    """
+# read head
+    head = {} # store head information including ncols, nrows,...
+    numheadrows = 6
+    n=1
+    with gzip.open(fileName, 'rt') as f:
+    # read head
+        for line in f:
+            if n<=numheadrows:
+                line = line.split(" ",1)
+                head[line[0]] = float(line[1])
+            else:
+                break
+            n = n+1
+    gridArray  = np.loadtxt(fileName, skiprows=numheadrows,dtype='float64')
+    gridArray[gridArray == head['NODATA_value']] = float('nan')
+    left = head['xllcorner']
+    right = head['xllcorner']+head['ncols']*head['cellsize']
+    bottom = head['yllcorner']
+    top = head['yllcorner']+head['nrows']*head['cellsize']
+    extent = (left,right,bottom,top)
+    #gridArray = float(gridArray)
+    return gridArray,head,extent
+#%% zG,headG = CombineRaster(inputFolder,outputName=[],fileTag='*.asc')
+def CombineRaster(inputFolder,outputName=[],fileTag='*.asc'):
+    fileList = glob.glob(inputFolder+'/'+fileTag)
+    _,_,extent = arcgridread(fileList[0])
+    left = extent[0]
+    right = extent[1]
+    bottom = extent[2]
+    top = extent[3]
+    zList = []
+    headList = []
+    for file in fileList:
+        print(file[-17:])
+        z,head,extent = arcgridread(file)
+        zList.append(z)
+        headList.append(head)
+        left = min(left,extent[0])
+        right = max(right,extent[1])
+        bottom = min(bottom,extent[2])
+        top = max(top,extent[3])
+    # global raster
+    headG = head.copy()
+    headG['xllcorner'] = left
+    headG['yllcorner'] = bottom
+    headG['ncols'] = int((right-left)/headG['cellsize'])
+    headG['nrows'] = int((top-bottom)/headG['cellsize'])
+    zG = np.zeros((headG['nrows'],headG['ncols']))+np.nan
+    for i in range(len(fileList)):
+        z = zList[i]
+        head = headList[i]        
+        # centre coordinats of the first element in array z
+        x = head['xllcorner']+head['cellsize']/2
+        y = head['yllcorner']+head['cellsize']*(head['nrows']-0.5)        
+        r0,c0 = Map2Sub(x,y,headG)
+        #print(head['nrows'],head['ncols'])        
+        zG[r0:r0+int(head['nrows']),c0:c0+int(head['ncols'])] = z
+        print(i)
+    if len(outputName)>0:
+        arcgridwrite(outputName,zG,headG)
+    extentG = (left,right,bottom,top)
+    return zG,headG,extentG
