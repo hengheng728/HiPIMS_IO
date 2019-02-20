@@ -10,8 +10,8 @@ import pandas as pd
 import shutil
 import glob
 import gzip
-import os    
-from ArcGridDataProcessing import arcgridread
+import os
+from ArcGridDataProcessing import arcgridread,arcgridwrite
 
 #%% Combine Grid files from Multiple GPU outputs:
 def CombineGridFile(rootPath,numSection,fileTag):
@@ -28,7 +28,10 @@ def CombineGridFile(rootPath,numSection,fileTag):
     if 'DEM' in fileTag:
         fileTail = '/input/mesh/DEM.txt'
     else:
-        fileTail = '/output/' + fileTag + '.asc'
+        if fileTag.endswith('.asc'):
+            fileTail = '/output/' + fileTag
+        else:
+            fileTail = '/output/' + fileTag + '.asc'
     if rootPath[-1]!='/':
         rootPath = rootPath+'/'
     demMatGlobal = []
@@ -52,7 +55,8 @@ def CombineGridFile(rootPath,numSection,fileTag):
 
 
 #%% combine gauge files from Multiple GPU outputs:
-def CombineGaugeFile(rootPath,numSection,fileTag,writeFolder=False):
+def CombineGaugeFile(rootPath,numSection,fileTag):
+    #gaugeGeoTable,gaugeTimeSeries=CombineGaugeFile(rootPath,numSection,fileTag)
     """
     Input:
     rootPath: directory of case input files containing domain ID 0,1,... folder
@@ -77,6 +81,7 @@ def CombineGaugeFile(rootPath,numSection,fileTag,writeFolder=False):
         fileName = rootPath+str(i)+gaugeFileTail
         gaugeArray  = np.loadtxt(fileName,dtype='float64')
         numGauge = gauges_ind.size
+        
         if i==0:
             gauges_ind_pos_All = gauges_ind_pos+0
             if 'hU' in fileTag:
@@ -88,7 +93,15 @@ def CombineGaugeFile(rootPath,numSection,fileTag,writeFolder=False):
             if 'hU' in fileTag:
                 gaugeArray_All = np.c_[gaugeArray_All,gaugeArray[:,1:numGauge*2+1]]
             else:
-                gaugeArray_All = np.c_[gaugeArray_All,gaugeArray[:,1:numGauge+1]]
+                try:
+                    gaugeArray_All = np.c_[gaugeArray_All,gaugeArray[:,1:numGauge+1]]
+                except ValueError:
+                    print('gaugeArray_All has', gaugeArray_All.shape[0], 'lines, while:')
+                    print(fileName,'has', gaugeArray.shape[0], ' lines')                    
+#                print(fileName)
+#                print(gaugeArray_All.shape)
+#                print(gaugeArray.shape)
+#                gaugeArray_All = np.c_[gaugeArray_All,gaugeArray[:,1:numGauge+1]]
     gaugeGeoTable = pd.DataFrame(gauges_ind_pos_All[:,1:],\
                                      index = gauges_ind_pos_All[:,0].astype('int'),\
                                      columns=['GaugeX','GaugeY'])
@@ -101,9 +114,7 @@ def CombineGaugeFile(rootPath,numSection,fileTag,writeFolder=False):
         else:
             columnsName.append('Gauge_' + str(i))
     gaugeTimeSeries = pd.DataFrame(gaugeArray_All,columns=columnsName)
-    if writeFolder==True:
-        gaugeGeoTable.to_csv(rootPath+'gaugeGeo.dat',sep=' ')
-        gaugeTimeSeries.to_csv(rootPath+fileTag+'TimeSeries.dat',sep=' ',index=False)
+
     return gaugeGeoTable,gaugeTimeSeries
 
 #%% Write and compress asc file
@@ -126,7 +137,7 @@ def ArcgridwriteGZip(fileName,Z,head):
     Z[np.isnan(Z)]= head['NODATA_value']
     np.savetxt(the_ascfile,Z,fmt='%.3f', delimiter=' ')
     the_ascfile.close()
-    print(fileName)
+    #print(fileName)
     return None
 #%%
 def ArcgridreadGZip(fileName):
@@ -156,6 +167,75 @@ def ArcgridreadGZip(fileName):
     extent = (left,right,bottom,top)
     #gridArray = float(gridArray)
     return gridArray,head,extent
+#%%
+def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True):
+    """
+    Combine and write a series of MultiGPU ouput asc files as gz file (default) or asc file
+    fileTag is a string end with '.asc' or a list of asc file names
+    example:
+        CombineWriteGridFiles(rootPath,numSec,'*.asc') combine and write all asc files in gz format
+        CombineWriteGridFiles(rootPath,numSec,['h_0.asc','h_3600_max.asc']) combine and write some asc files
+        CombineWriteGridFiles(rootPath,numSec,'*.asc',compress=False) combine and write all asc files in asc format
+    """
+    if rootPath[-1]!='/':
+        rootPath = rootPath+'/'
+    
+    os.makedirs(rootPath+'output',exist_ok=True)
+    
+    if isinstance(fileTag,list):
+        filesToCombine = fileTag
+    else:
+        os.chdir(rootPath+str(numSection-1)+'/output')
+        filesToCombine = glob.glob(fileTag)
+        os.chdir(rootPath)
+        
+    for ascFile in filesToCombine:
+        if ascFile.endswith('.asc'):
+            grid,head,_ = CombineGridFile(rootPath,numSection,ascFile)
+            writeFileName = rootPath+'output/MG_'+ascFile
+            if compress:
+                ArcgridwriteGZip(writeFileName,grid,head)
+                writeFileName=writeFileName+'.gz'
+            else:
+                arcgridwrite(writeFileName,grid,head)
+            print(writeFileName+' is created')
+    return None
+
+#%%
+def CombineWriteGaugeFiles(rootPath,numSection,fileTag='*gauges.dat'):
+    """
+    Combine and write a MultiGPU ouput gauge files as a gauge coordinates file 
+        and time series for h, eta, and hU
+    fileTag is a string end with '.gauges.dat' or a list of gauges file names
+    example:
+        CombineWriteGridFiles(rootPath,numSec,'*.gauges.dat') combine and write all gauges files
+        CombineWriteGridFiles(rootPath,numSec,['h_gauges.dat','eta_gauges.dat']) 
+                  combine and write some specific gauges files
+
+    """
+    if rootPath[-1]!='/':
+        rootPath = rootPath+'/'
+    
+    os.makedirs(rootPath+'output',exist_ok=True)
+    
+    if isinstance(fileTag,list):
+        filesToCombine = fileTag
+    else:
+        os.chdir(rootPath+str(numSection-1)+'/output')
+        filesToCombine = glob.glob(fileTag)
+        os.chdir(rootPath)
+    print(filesToCombine)    
+    for gaugeFile in filesToCombine:
+        
+        if gaugeFile.endswith('gauges.dat'):
+            readFileName = gaugeFile[:-4]
+            gaugeGeoTable,gaugeTimeSeries=CombineGaugeFile(rootPath,numSection,readFileName)
+            gaugeTimeSeries.to_csv(rootPath+'output/MG_'+readFileName+'TimeSeries.dat',sep=' ',index=False)            
+            print(readFileName+' is created')
+    gaugeGeoTable.to_csv(rootPath+'output/MG_gaugeGeo.dat',sep=' ')
+    print('MG_gaugeGeo.dat is created')
+    return None
+
 #%% delete output file or files
 def DeleteMultiOutputFiles(rootPath,numSec,fileStr):
     """
