@@ -9,10 +9,43 @@ import numpy as np
 import sys
 import time
 from ArcGridDataProcessing import arcgridwrite
-import InputSetupFuncs as ISF 
+import InputSetupFuncs as ISF
 # import InputSetupFuncs
 # import InputSetupFuncs_MG
 import InputSetupFuncs_MG as ISF_MG
+
+def HiPIMS_setup(folderName, demMat, demHead, numSection=1, boundList=[],
+               fileToCreate='all', h0=0, hU0=[0,0], manning=0.035,
+               rain_mask=0, rain_source=np.array([[0,0],[60,0]]),
+               sewer_sink=0, cumulative_depth=0, hydraulic_conductivity=0,
+               capillary_head=0, water_content_diff=0,               
+               gauges_pos=[], timesValue=[0,3600,600,3600]):
+    """
+    folderName: a path to store input folder
+    fileToCreate: 'all'|'z','h','hU','manning','sewer_sink',
+                        'cumulative_depth','hydraulic_conductivity',
+                        'capillary_head','water_content_diff'
+                        'precipitation_mask','precipitation_source',
+                        'boundary_condition','gauges_pos'
+                        
+    """
+    if numSection==1: # call function for single GPU
+        InputSetup(folderName, demMat, demHead, boundList, fileToCreate,
+                   h0, hU0, manning, rain_mask,rain_source,
+                   sewer_sink, cumulative_depth, hydraulic_conductivity,
+                   capillary_head, water_content_diff, gauges_pos)
+    else: # call function for multi-GPU
+        InputSetup_MG(folderName, demMat, demHead, numSection, boundList,
+                   fileToCreate, h0, hU0, manning, rain_mask, rain_source,
+                   sewer_sink, cumulative_depth, hydraulic_conductivity,
+                   capillary_head, water_content_diff, gauges_pos)
+    if fileToCreate=='all' or 'device_setup' in fileToCreate:    
+        GenDeviceFile(folderName,numSection)
+    # start, end, output interval, backup interval, cooldown interval
+    if fileToCreate=='all' or 'times_setup' in fileToCreate:
+        GenTimeFile(folderName,numSection,Values=timesValue) 
+    return None
+
 #%%****************************************************************************
 
 #%================================Single GPU Input=============================
@@ -218,6 +251,36 @@ def InputSetup_MG(folderName,demMat,demHead,numSection=1,boundList=[],
                 fileLeft=0
             updt(totalFileNum, progress, showTag,timeElapse*fileLeft)
             progress = progress+1
+    return None
+#%%**********************************Independent functions*********************
+    #functions do not based on DEM data
+#%% WriteBoundSource
+def WriteRainSource(rootPath,rain_source,numSection):
+    if numSection==1: # single GPU
+        _,_,_,dirField = ISF.CreateIOFolders(rootPath)
+        ISF.WriteRainSource(dirField,rain_source)
+    else: # multi-GPU
+        sectionPathList = ISF_MG.CreateIOFolders_MG(rootPath,numSection)
+        ISF_MG.WriteRainSource_Sec(sectionPathList,rain_source)
+    return None
+#%% device_setup.dat
+def GenDeviceFile(rootPath,numGPU,Values=[]):
+    if len(Values)==0:
+        Values=np.array(range(numGPU))
+    Values = Values.reshape((1,Values.size))
+    if numGPU==1:
+        np.savetxt(rootPath+'/input/device_setup.dat',Values,fmt='%g')
+    else:
+        np.savetxt(rootPath+'/device_setup.dat',Values,fmt='%g')
+    return None
+#%% times_setup.dat
+def GenTimeFile(rootPath,numGPU,Values=[0,3600,1800,3600]):
+    Values=np.array(Values)
+    Values = Values.reshape((1,Values.size))
+    if numGPU==1:
+        np.savetxt(rootPath+'/input/times_setup.dat',Values,fmt='%g')
+    else:
+        np.savetxt(rootPath+'/times_setup.dat',Values,fmt='%g')
     return None
 #%% Displays or updates a console progress bar
 def updt(total, progress, fileTag, timeLeft):
