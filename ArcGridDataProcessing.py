@@ -15,6 +15,7 @@ __author__ = 'Xiaodong Ming'
 import numpy as np
 import glob
 import gzip
+import math
 #import os
 def arcgridread(fileName,headrows = 6):
     """
@@ -45,6 +46,8 @@ def arcgridread(fileName,headrows = 6):
 # read value array
     gridArray  = np.loadtxt(fileName, skiprows=numheadrows,dtype='float64')
     gridArray[gridArray == head['NODATA_value']] = float('nan')
+    head['ncols']=int(head['ncols'])
+    head['nrows']=int(head['nrows'])
     left = head['xllcorner']
     right = head['xllcorner']+head['ncols']*head['cellsize']
     bottom = head['yllcorner']
@@ -86,16 +89,20 @@ def makeDiagonalShape(extent):
                            [extent[1],extent[3]],
                            [extent[0],extent[3]]])
     return shapePoints
-#%%
+#%% rows,cols = Map2Sub(X,Y,zHead)
 def Map2Sub(X,Y,zHead):
     # convert map points to subscripts of a matrix with geo reference zHead
     # x and y coordinate of the centre of the first cell in the matrix
-    x11 = zHead['xllcorner']+0.5*zHead['cellsize']
-    y11 = zHead['yllcorner']+(zHead['nrows']+0.5)*zHead['cellsize']
-    rows = -(Y-y11)/zHead['cellsize']
-    rows = int(rows)-1
-    cols = (X-x11)/zHead['cellsize']+1
-    cols = int(cols)-1#.astype('int64')
+    x0 = zHead['xllcorner']+0.5*zHead['cellsize']
+    y0 = zHead['yllcorner']+(zHead['nrows']-0.5)*zHead['cellsize']
+    rows = (y0-Y)/zHead['cellsize'] # row and col number starts from 0
+    cols = (X-x0)/zHead['cellsize']
+    if isinstance(rows,np.ndarray):
+        rows = rows.astype('int64')
+        cols = cols.astype('int64') #.astype('int64')
+    else:
+        rows = int(rows)
+        cols = int(cols)
     return rows,cols
 #%%
 def Sub2Map(rows,cols,zHead):
@@ -118,6 +125,75 @@ def MaskInterp(maskMat,maskHead,zMat,zHead):
     cols_mask[cols_mask>maskHead['ncols']-1]=maskHead['ncols']-1
     values = maskMat[rows_Mask,cols_mask]
     zMask = zMat+0
+    zMask[rows_Z,cols_Z]=values
+    return zMask
+#%% resample grid data to a new resolution via nearest interpolation
+def GridResample(zMat,head,newsize):
+    """
+    resample a grid to a new grid resolution
+    """
+    if isinstance(newsize, dict):
+        head_new = newsize.copy()
+    else:            
+        head_new = head.copy()
+        head_new['cellsize'] = newsize
+        ncols = math.floor(head['cellsize']*head['ncols']/newsize)
+        nrows = math.floor(head['cellsize']*head['nrows']/newsize)
+        head_new['ncols']=ncols
+        head_new['nrows']=nrows
+    #centre of the first cell in zMat
+    x11 = head_new['xllcorner']+0.5*head_new['cellsize']
+    y11 = head_new['yllcorner']+(head_new['nrows']-0.5)*head_new['cellsize']
+    xAll = np.linspace(x11,x11+(head_new['ncols']-1)*head_new['cellsize'],head_new['ncols'])
+    yAll = np.linspace(y11,y11-(head_new['nrows']-1)*head_new['cellsize'],head_new['nrows'])
+    rowAll,colAll = Map2Sub(xAll,yAll,head)
+    rows_Z,cols_Z = np.meshgrid(rowAll,colAll) # nrows*ncols array
+    zNew = zMat[rows_Z,cols_Z]
+    zNew = zNew.transpose()
+    extent_new = demHead2Extent(head_new)
+    return zNew, head_new, extent_new
+#%% zMatClip,headClip=ArrayClip(zMat,head,clipExtent)
+def ArraySquareClip(zMat,head,clipExtent):
+    """
+    clip array to a smaller one according to mask and its geoinformation
+    extent = (left,right,bottom,top)
+    """
+    
+    X = np.array([clipExtent[0],clipExtent[1]]) # left to right
+    Y = np.array([clipExtent[3],clipExtent[2]]) # top to bottom
+    rows,cols = Map2Sub(X,Y,head)
+    zMatClip = zMat[rows[0]:rows[1]+1,cols[0]:cols[1]+1]
+    xllcorner = head['xllcorner']+cols[0]* head['cellsize']
+    yllcorner = head['yllcorner'] + (zMat.shape[0]-rows[1]) * head['cellsize']
+    headClip = head.copy()
+    headClip['xllcorner']= xllcorner
+    headClip['yllcorner']= yllcorner
+    headClip['nrows'] = zMatClip.shape[0]
+    headClip['ncols'] = zMatClip.shape[1]
+    extentClip = demHead2Extent(headClip)
+    return zMatClip,headClip,extentClip
+    
+#%% zMask = MaskExtraction(maskMat,maskHead,zHead)
+def MaskExtraction(maskMat,maskHead,zHead,maskValue=False):
+    """
+    extract rainfall mask to model domian with its size and resolution
+    # zMask = MaskExtraction(maskMat,maskHead,zHead)
+    # maskValue=False:mask value is not given in maskMat, so a mask value mask is to be created
+    """
+    if ~maskValue:
+        maskMat = np.arange(np.size(maskMat)).reshape((maskHead['nrows'],maskHead['ncols']),order='F')
+    zMask = np.zeros((zHead['nrows'],zHead['ncols']))
+    rows_Z,cols_Z = np.where(~np.isnan(zMask))
+    X,Y = Sub2Map(rows_Z,cols_Z,zHead)
+    rowsInMask,colsInMask = Map2Sub(X,Y,maskHead)
+    
+    # make sure rows and cols of domain scells are inside mask 
+    rowsInMask[rowsInMask<0]=0
+    colsInMask[colsInMask<0]=0
+    rowsInMask[rowsInMask>maskHead['nrows']-1]=maskHead['nrows']-1
+    colsInMask[colsInMask>maskHead['ncols']-1]=maskHead['ncols']-1
+    
+    values = maskMat[rowsInMask,colsInMask] # mask values
     zMask[rows_Z,cols_Z]=values
     return zMask
 #%% Write and compress asc file
@@ -163,6 +239,8 @@ def ArcgridreadGZip(fileName):
             n = n+1
     gridArray  = np.loadtxt(fileName, skiprows=numheadrows,dtype='float64')
     gridArray[gridArray == head['NODATA_value']] = float('nan')
+    head['ncols']=int(head['ncols'])
+    head['nrows']=int(head['nrows'])
     left = head['xllcorner']
     right = head['xllcorner']+head['ncols']*head['cellsize']
     bottom = head['yllcorner']
@@ -207,6 +285,56 @@ def CombineRaster(inputFolder,outputName=[],fileTag='*.asc'):
         zG[r0:r0+int(head['nrows']),c0:c0+int(head['ncols'])] = z
         print(i)
     if len(outputName)>0:
-        arcgridwrite(outputName,zG,headG)
+        if outputName[-2:]=='gz':
+            ArcgridwriteGZip(outputName,zG,headG)
+        else:
+            arcgridwrite(outputName,zG,headG)    
     extentG = (left,right,bottom,top)
     return zG,headG,extentG
+#%% zNew,headNew=ArcgridReplace(z0,head0,zRe,headRe)
+def ArcgridReplace(z0,head0,zRe,headRe):
+    """ To replace part of values in z0 with values in zRe
+    # the cellsize in head0 and headRe must be the same
+    """        
+    # centre coordinats of the first element in array z
+    if head0['cellsize']!=headRe['cellsize']:
+        raise TypeError('the cellsize in head0 and headRe must be the same')
+    x0 = headRe['xllcorner']+headRe['cellsize']/2
+    y0 = headRe['yllcorner']+headRe['cellsize']*(headRe['nrows']-0.5)
+    r0,c0 = Map2Sub(x0,y0,head0)
+    rowMin = min(r0,0)
+    rowMax = max(r0+headRe['nrows']-1,head0['nrows']-1)
+    colMin = min(c0,0)
+    colMax = max(c0+headRe['ncols']-1,head0['ncols']-1)
+
+    if rowMin<0:
+        Vtop = -rowMin
+    else:
+        Vtop = 0
+    if colMin<0:
+        Vleft = -colMin
+    else:
+        Vleft = 0
+    if rowMax>head0['nrows']-1:
+        Vbottom = rowMax-(head0['nrows']-1)
+    else:
+        Vbottom = 0
+    if colMax>head0['ncols']-1:
+        Vright = colMax-(head0['ncols']-1)
+    else:
+        Vright = 0
+        
+    padWidth = [(Vtop,Vbottom),(Vleft,Vright)]
+    zNew = np.pad(z0,padWidth,mode='constant',constant_values=head0['NODATA_value'])
+    zNew[zNew==head0['NODATA_value']]=np.nan
+    headNew = head0.copy()
+    headNew['nrows']=zNew.shape[0]
+    headNew['ncols']=zNew.shape[1]
+    headNew['xllcorner'] = head0['xllcorner']+head0['cellsize']*colMin
+    headNew['yllcorner'] = head0['yllcorner']+head0['cellsize']*(head0['ncols']-rowMax)
+    r0,c0 = Map2Sub(x0,y0,headNew)
+    zRe1 = zNew[r0:r0+headRe['nrows'],c0:c0+headRe['ncols']]
+    zRe1[~np.isnan(zRe)]=zRe[~np.isnan(zRe)]
+    zNew[r0:r0+headRe['nrows'],c0:c0+headRe['ncols']]=zRe1
+    
+    return zNew,headNew
