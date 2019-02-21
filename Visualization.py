@@ -13,6 +13,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import gzip
 from osgeo import osr, gdal 
 import shutil
+import os
 #%% draw dem map with boundary cell scatters
 def DEMwithBoundary(demMat,demHead,
                     boundList=[],
@@ -100,17 +101,21 @@ def Asc2GeoTiff(ascfileName,tiffFileName,srcEPSG=27700,destEPSG=4326):
     if ~target.endswith('.tif'):
         target=target+'.tif'
     # open CSV source file
+    deleteFlag = False
     if source.endswith('.gz'):
         with gzip.open(source, 'rb') as f_in:
             with open(source[:-3], 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
         source = source[:-3]
+        deleteFlag = True
 
     cvs = gdal.Open(source)
     #cvs = gdal.Open(source)
     if cvs is None:
         print( 'ERROR: Unable to open %s' % source)
         return
+    if deleteFlag:
+        os.remove(source)
 
     # get GeoTIFF driver
     geotiff = gdal.GetDriverByName("GTiff")
