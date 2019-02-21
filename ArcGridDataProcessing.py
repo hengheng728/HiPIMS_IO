@@ -338,3 +338,16 @@ def ArcgridReplace(z0,head0,zRe,headRe):
     zNew[r0:r0+headRe['nrows'],c0:c0+headRe['ncols']]=zRe1
     
     return zNew,headNew
+#%% Landuse2Manning
+def Landuse2Manning(landMat,landV,manningV,defaultM=0.035):
+    """
+    convert landuse matrix to a manning matrix
+    landMat: (numpy array) landuse matrix
+    landV: (list or Series) landuse value
+    manningV: (list or Series) manning value corresponding to landuse value
+    defaultM:  a default value in manning matrix
+    """
+    manningMat = np.zeros(landMat.shape)+defaultM
+    for i in range(len(landV)):
+        manningMat[landMat==landV[i]]=manningV[i]
+    return manningMat
