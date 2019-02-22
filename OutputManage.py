@@ -14,7 +14,7 @@ import os
 from ArcGridDataProcessing import arcgridread,arcgridwrite
 
 #%% Combine Grid files from Multiple GPU outputs:
-def CombineGridFile(rootPath,numSection,fileTag):
+def CombineGridFile(rootPath,numSection,fileTag,delete=False):
     """
     demMatGlobal,demHeadGlobal,extentGlobal=CombineGridFile(rootPath,numSection,fileTag)
     Input:
@@ -43,6 +43,8 @@ def CombineGridFile(rootPath,numSection,fileTag):
         else:
             demMat,demHead,_ = arcgridread(fileName)
             demMatGlobal = np.r_[demMat[0:-2,:],demMatGlobal]
+        if delete:   
+            os.remove(fileName)
     row,col = demMatGlobal.shape
     demHeadGlobal['ncols'] = col
     demHeadGlobal['nrows'] = row
@@ -168,7 +170,7 @@ def ArcgridreadGZip(fileName):
     #gridArray = float(gridArray)
     return gridArray,head,extent
 #%%
-def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True):
+def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True,delete=True):
     """
     Combine and write a series of MultiGPU ouput asc files as gz file (default) or asc file
     fileTag is a string end with '.asc' or a list of asc file names
@@ -191,7 +193,7 @@ def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True):
         
     for ascFile in filesToCombine:
         if ascFile.endswith('.asc'):
-            grid,head,_ = CombineGridFile(rootPath,numSection,ascFile)
+            grid,head,_ = CombineGridFile(rootPath,numSection,ascFile,delete=delete)
             writeFileName = rootPath+'output/MG_'+ascFile
             if compress:
                 ArcgridwriteGZip(writeFileName,grid,head)
