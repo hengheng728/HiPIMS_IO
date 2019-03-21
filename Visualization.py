@@ -92,7 +92,7 @@ def InundationMap(zMat,zHead,depth=0.2,figureName=[],
     return fig,ax
 
 #%% convert ascii file to geotif
-def Asc2GeoTiff(ascfileName,tiffFileName,srcEPSG=27700,destEPSG=4326):
+def Asc2GeoTiff(ascfileName,tiffFileName,srcEPSG=27700,destEPSG=4326,compress=True):
     # convert a projected asc file to a tiff with geographical coordinates
     # srcEPSG = 27700 #BNG
     # destEPSG = 4326 #WGS84
@@ -163,5 +163,11 @@ def Asc2GeoTiff(ascfileName,tiffFileName,srcEPSG=27700,destEPSG=4326):
 
     # save projected in-memory raster to disk
     geotiff.CreateCopy(target, dest_ds, 0 )
+    if compress:
+        with open(target, 'rb') as f_in:
+            with gzip.open(target+'.gz', 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        os.remove(target)
+    
     return None
 
