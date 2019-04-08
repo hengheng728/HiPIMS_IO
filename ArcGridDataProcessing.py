@@ -48,14 +48,10 @@ def arcgridread(fileName,headrows = 6):
     gridArray[gridArray == head['NODATA_value']] = float('nan')
     head['ncols']=int(head['ncols'])
     head['nrows']=int(head['nrows'])
-    left = head['xllcorner']
-    right = head['xllcorner']+head['ncols']*head['cellsize']
-    bottom = head['yllcorner']
-    top = head['yllcorner']+head['nrows']*head['cellsize']
-    extent = (left,right,bottom,top)
+    extent = demHead2Extent(head)
     #gridArray = float(gridArray)
     return gridArray,head,extent
-#%%
+#%% write grid data into txt file with arc grid format
 def arcgridwrite(fileName,Z,head):    
     Z = Z+0
     Z[np.isnan(Z)]= head['NODATA_value']
@@ -70,7 +66,7 @@ def arcgridwrite(fileName,Z,head):
         f.write(b"NODATA_value    %g\n" % head['NODATA_value'])    
         np.savetxt(f,Z,fmt='%g', delimiter=' ')
     return None
-#%%
+#%% convert head data to extent
 def demHead2Extent(demHead):
     # convert dem head file (dict) to a spatial extent of the DEM
     R = demHead
@@ -104,7 +100,7 @@ def Map2Sub(X,Y,zHead):
         rows = int(rows)
         cols = int(cols)
     return rows,cols
-#%%
+#%% X,Y = Sub2Map(rows,cols,zHead)
 def Sub2Map(rows,cols,zHead):
     # convert row and cols in a matrix with geo reference zHead to X and Y coordinates
     # x and y coordinate of the centre of the first cell in the matrix
@@ -335,8 +331,7 @@ def ArcgridReplace(z0,head0,zRe,headRe):
     r0,c0 = Map2Sub(x0,y0,headNew)
     zRe1 = zNew[r0:r0+headRe['nrows'],c0:c0+headRe['ncols']]
     zRe1[~np.isnan(zRe)]=zRe[~np.isnan(zRe)]
-    zNew[r0:r0+headRe['nrows'],c0:c0+headRe['ncols']]=zRe1
-    
+    zNew[r0:r0+headRe['nrows'],c0:c0+headRe['ncols']]=zRe1    
     return zNew,headNew
 #%% Landuse2Manning
 def Landuse2Manning(landMat,landV,manningV,defaultM=0.035):
@@ -351,3 +346,4 @@ def Landuse2Manning(landMat,landV,manningV,defaultM=0.035):
     for i in range(len(landV)):
         manningMat[landMat==landV[i]]=manningV[i]
     return manningMat
+
