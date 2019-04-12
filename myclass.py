@@ -7,6 +7,8 @@ Created on Sat Apr  6 13:03:25 2019
 """
 import numpy as np
 import gzip
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class Test(object):
     def __init__(self,name,score):
@@ -40,13 +42,13 @@ class raster(object):
         __read_asc
         
     """
-    def __init__(self,sourceFile=[],z=[],head=[]):
+    def __init__(self,sourceFile=None,z=None,head=None):
         """
         sourceFile: name of a asc file if it is needed
         
         """
         self.sourceFile = sourceFile
-        if len(sourceFile)!=0:
+        if sourceFile is not None:
             z,head = self.__read_asc()
         self.dataArray = z
         self.dataHead = head
@@ -111,7 +113,7 @@ class raster(object):
         head['ncols']=int(head['ncols'])
         head['nrows']=int(head['nrows'])
         return dataArray,head
-#===============================output=========================================    
+#%%===============================output=======================================   
     def write_asc(self,outputFile,compression=False):
         """
         write raster as asc format file
@@ -140,4 +142,36 @@ class raster(object):
         f.write(b"NODATA_value    %g\n" % head['NODATA_value'])
         np.savetxt(f,Z,fmt='%g', delimiter=' ')
         f.close()        
+#%%=============================Visualization==================================
+    #%% draw inundation map with domain outline
+    def mapshow(self,figureName=None,figsize=None,dpi=300,vmin=None,vmax=None,
+                cax=True):
+        """
+        Display raster data without projection
+        figureName: the file name to export map,if figureName is empty, then
+            the figure will not be saved
+        figsize: the size of map
+        dpi: The resolution in dots per inch
+        vmin and vmax define the data range that the colormap covers
+        """
+        np.warnings.filterwarnings('ignore')    
+        fig, ax = plt.subplots(1, figsize=figsize)
+        # draw inundation
+        zMat = self.dataArray
+        zMat[zMat==self.dataHead['NODATA_value']]=np.nan
+        img=plt.imshow(zMat,extent=self.extent,vmin=vmin,vmax=vmax)
+        # colorbar
+    	# create an axes on the right side of ax. The width of cax will be 5%
+        # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+        if cax==True:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(img, cax=cax)
+        ax.axes.grid(linestyle='-.',linewidth=0.2)
+        # save figure
+        if figureName is not None:
+            fig.savefig(figureName, dpi=dpi)
+            
+        return fig,ax
+
         
