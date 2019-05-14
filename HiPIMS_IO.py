@@ -296,7 +296,7 @@ def updt(total, progress, fileTag, timeLeft):
     if progress >= 1.:
         progress, status = 1, "\r\n"
     block = int(round(barLength * progress))
-    text = "\r|{}| {:.0f}% writing {:<16} time left: {:.0f}s {}".format(
+    text = "\r|{}| {:.0f}% {:<16} time left: {:.0f}s {}".format(
         chr(9608) * block + "-" * (barLength - block), round(progress * 100, 0),
         fileTag,timeLeft,status)
     sys.stdout.write(text)
