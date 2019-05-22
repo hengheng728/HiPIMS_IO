@@ -109,7 +109,7 @@ def InputSetup(folderName,demMat,demHead,boundList=[],
 #------------ create DEM.txt in mesh-------------------------------------------
     if 'DEM' in fileToCreate:
         fileNameToRite = dirMesh+'DEM.txt'
-        updt(totalFileNum, progress, 'DEM',timeElapse*fileLeft*10)
+        ProgressBar(totalFileNum, progress, 'DEM',timeElapse*fileLeft*10)
         start = time.perf_counter()
         arcgridwrite(fileNameToRite,demMat,demHead)        
         progress = progress+1
@@ -124,7 +124,7 @@ def InputSetup(folderName,demMat,demHead,boundList=[],
                 showTag = key[0:5]+'..'+key[-5:]
             else:
                 showTag = key
-            updt(totalFileNum, progress, showTag,timeElapse*fileLeft)
+            ProgressBar(totalFileNum, progress, showTag,timeElapse*fileLeft)
             if key=='precipitation_mask': # time 1
                 id_zV = ISF.Create_ID_zValue_Array(CellIDMat,value)
                 ISF.WriteRainMask(dirField,id_zV)
@@ -150,7 +150,7 @@ def InputSetup(folderName,demMat,demHead,boundList=[],
                 fileLeft=0
             end = time.perf_counter()
             timeElapse = end-start            
-            #updt(totalFileNum, progress, showTag,timeElapse*fileLeft)
+            #ProgressBar(totalFileNum, progress, showTag,timeElapse*fileLeft)
             progress = progress+1
             #print('write_File: '+str(end-start))
 
@@ -221,11 +221,11 @@ def InputSetup_MG(folderName,demMat,demHead,numSection=1,boundList=[],
         fileLeft=13
 #------------ create DEM.txt in mesh-------------------------------------------
     if 'DEM' in fileToCreate:
-        updt(totalFileNum, progress-1, 'DEM',timeElapse*fileLeft) 
+        ProgressBar(totalFileNum, progress-1, 'DEM',timeElapse*fileLeft) 
         ISF_MG.WriteSecDEM(sectionPathList,demMat,demHeadList,sectionRowInd)
         #print('DEM '+str(timeElapse))
         fileLeft = totalFileNum-1
-        updt(totalFileNum, progress, 'DEM',timeElapse*fileLeft)        
+        ProgressBar(totalFileNum, progress, 'DEM',timeElapse*fileLeft)        
         progress = progress+1
 #------------ create ztype, rainfall, and boundary files-----------------------
     for key,value in fieldFiles.items():        
@@ -234,7 +234,7 @@ def InputSetup_MG(folderName,demMat,demHead,numSection=1,boundList=[],
                 showTag = key[0:5]+'..'+key[-5:]
             else:
                 showTag = key
-            updt(totalFileNum, progress-1, showTag,timeElapse*fileLeft)            
+            ProgressBar(totalFileNum, progress-1, showTag,timeElapse*fileLeft)            
             if key=='precipitation_mask':
                 ISF_MG.WriteRainMask_Sec(sectionPathList,CellIDList,value,sectionRowInd)
             elif key=='precipitation_source':
@@ -249,7 +249,7 @@ def InputSetup_MG(folderName,demMat,demHead,numSection=1,boundList=[],
             #print(key+' '+str(timeElapse))
             if fileLeft<0:
                 fileLeft=0
-            updt(totalFileNum, progress, showTag,timeElapse*fileLeft)
+            ProgressBar(totalFileNum, progress, showTag,timeElapse*fileLeft)
             progress = progress+1
     return None
 #%%**********************************Independent functions*********************
@@ -283,7 +283,7 @@ def GenTimeFile(rootPath,numGPU,Values=[0,3600,1800,3600]):
         np.savetxt(rootPath+'/times_setup.dat',Values,fmt='%g')
     return None
 #%% Displays or updates a console progress bar
-def updt(total, progress, fileTag, timeLeft):
+def ProgressBar(total, progress, fileTag, timeLeft):
     """
     Displays or updates a console progress bar.
     """

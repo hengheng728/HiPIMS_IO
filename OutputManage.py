@@ -201,7 +201,7 @@ def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True,dele
             else:
                 arcgridwrite(writeFileName,grid,head)
             print(writeFileName+' is created')
-    return None
+    return writeFileName
 
 #%%
 def CombineWriteGaugeFiles(rootPath,numSection,fileTag='*gauges.dat'):
