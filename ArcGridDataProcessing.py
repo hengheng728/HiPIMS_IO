@@ -17,6 +17,46 @@ import glob
 import gzip
 import math
 #import os
+
+def ArcgridHeaderRead(fileName):
+    """
+    read the header of an asc file and return header
+    if self.sourceFile ends with '.gz', then read the compressed file
+    """
+    try:
+        fh = open(fileName, 'r')
+        fh.close()
+    # Store configuration file values
+    except FileNotFoundError:
+        # Keep preset values
+        print('Error: '+fileName+' does not appear to exist')
+        return
+    # read header
+    header = {} # store header information including ncols, nrows,...
+    numheaderrows = 6
+    n=1
+    if fileName.endswith('.gz'):
+        # read header
+        with gzip.open(fileName, 'rt') as f:                
+            for line in f:
+                if n<=numheaderrows:
+                    line = line.split(" ",1)
+                    header[line[0]] = float(line[1])
+                else:
+                    break
+                n = n+1
+    else:
+        # read header
+        with open(fileName, 'rt') as f:            
+            for line in f:
+                if n<=numheaderrows:
+                    line = line.split(" ",1)
+                    header[line[0]] = float(line[1])
+                else:
+                    break
+                n = n+1
+    return header
+
 def arcgridread(fileName,headrows = 6):
     """
     read ArcGrid format raster file and return the gridded data array, 
@@ -219,6 +259,7 @@ def ArcgridreadGZip(fileName):
     """
     read ArcGrid format raster file and return the gridded data array, 
     coordinates and cellsize information and the extent of the grid
+    return gridArray,head,extent
     """
 # read head
     head = {} # store head information including ncols, nrows,...
