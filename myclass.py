@@ -60,14 +60,14 @@ class raster(object):
         
     """
 #%%======================== initialization function ===========================   
-    def __init__(self,sourceFile=None,array=None,header=None,epsg_code=None):
+    def __init__(self,sourceFile=None,array=None,header=None,epsg=None):
         """
         sourceFile: name of a asc/tif file if a file read is needed
         
         """
         self.sourceFile = sourceFile
-        if epsg_code is not None:
-            self.projection = self.__SetWktProjection(epsg_code)
+        if epsg is not None:
+            self.projection = self.__SetWktProjection(epsg)
         else:
             self.projection = None
         if sourceFile is None:
@@ -126,10 +126,10 @@ class raster(object):
         """
         from osgeo import ogr
         if isinstance(mask, str):
-            Shapefile =  mask
+            shpName =  mask
         # Open shapefile datasets        
         shpDriver = ogr.GetDriverByName('ESRI Shapefile')
-        shpDataset = shpDriver.Open(Shapefile, 0) # 0=Read-only, 1=Read-Write
+        shpDataset = shpDriver.Open(shpName, 0) # 0=Read-only, 1=Read-Write
         layer = shpDataset.GetLayer()
         shpExtent = np.array(layer.GetExtent()) #(minX,maxY,maxX,minY)           
         # 1. rectangle clip raster
