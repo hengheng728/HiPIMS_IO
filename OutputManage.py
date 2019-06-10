@@ -11,8 +11,6 @@ import shutil
 import glob
 import gzip
 import os
-import multiprocessing as mp # for parallel processing
-
 from ArcGridDataProcessing import arcgridread,arcgridwrite
 
 #%% Combine Grid files from Multiple GPU outputs:
@@ -172,7 +170,33 @@ def ArcgridreadGZip(fileName):
     #gridArray = float(gridArray)
     return gridArray,head,extent
 #%%
-def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True,delete=True,parallel=False):
+#%%
+def GenerateOneGridFile(rootPath,numSection,fileName,compress=True,delete=True):
+    """
+    Combine and write a series of MultiGPU ouput asc files as gz file (default) or asc file
+    filaName: a string end with '.asc', no file path
+    example:
+        CombineWriteGridFiles(rootPath,numSec,'h_129600.asc') combine and write h_129600.asc in gz format
+        CombineWriteGridFiles(rootPath,numSec,'*.asc',compress=False) combine and write all asc files in asc format
+    """
+    if rootPath[-1]!='/':
+        rootPath = rootPath+'/'
+    
+    os.makedirs(rootPath+'output',exist_ok=True)
+    
+    ascFile = fileName
+    if ascFile.endswith('.asc'):
+        grid,head,_ = CombineGridFile(rootPath,numSection,ascFile,delete=delete)
+        writeFileName = rootPath+'output/MG_'+ascFile
+        if compress:
+            ArcgridwriteGZip(writeFileName,grid,head)
+            writeFileName=writeFileName+'.gz'
+        else:
+            arcgridwrite(writeFileName,grid,head)
+        print(writeFileName+' is created')
+    return writeFileName
+#%%
+def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True,delete=True):
     """
     Combine and write a series of MultiGPU ouput asc files as gz file (default) or asc file
     fileTag is a string end with '.asc' or a list of asc file names
@@ -192,9 +216,8 @@ def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True,dele
         os.chdir(rootPath+str(numSection-1)+'/output')
         filesToCombine = glob.glob(fileTag)
         os.chdir(rootPath)
-    def loopFunction(ascFile,
-                     rootPath=rootPath,numSection=numSection,
-                     delete=delete,compress=compress):    
+        
+    for ascFile in filesToCombine:
         if ascFile.endswith('.asc'):
             grid,head,_ = CombineGridFile(rootPath,numSection,ascFile,delete=delete)
             writeFileName = rootPath+'output/MG_'+ascFile
@@ -204,15 +227,7 @@ def CombineWriteGridFiles(rootPath,numSection,fileTag='*.asc',compress=True,dele
             else:
                 arcgridwrite(writeFileName,grid,head)
             print(writeFileName+' is created')
-    if parallel is True: # use all GPUs for parallel computing
-        pool = mp.Pool(mp.cpu_count())
-        pool.map(loopFunction, [fileName for fileName in filesToCombine])
-    else: # no parallel computing
-        for fileName in filesToCombine:
-            loopFunction(fileName)
-        
-    
-    return None
+    return writeFileName
 
 #%%
 def CombineWriteGaugeFiles(rootPath,numSection,fileTag='*gauges.dat'):
